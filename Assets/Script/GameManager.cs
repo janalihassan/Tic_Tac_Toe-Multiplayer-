@@ -18,6 +18,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject cross;
     [SerializeField] private GameObject cricle;
 
+    private string currentTurnId = "";
     private PlayroomKit.Player playerOne;
     private PlayroomKit.Player playerTwo;
 
@@ -36,19 +37,26 @@ public class GameManager : MonoBehaviour
         _playroomKit.InsertCoin(new InitOptions()
         {
             maxPlayersPerRoom = 2,
-            defaultPlayerStates = new() {
+            defaultPlayerStates = new() 
+            {
             {"score", 0},
-            {"isDead", false}
-
-        },
+      
+            },
         }, () =>
         {
             _playroomKit.OnPlayerJoin(AddPlayer);
             _playroomKit.RpcRegister("SpawnShape", RpcSpawnShape);
             _playroomKit.RpcRegister("AssignIDs", RpcAssignIds);
             _playroomKit.RpcRegister("UpdateLocalPlayers", RpcUpdatePlayers);
+            _playroomKit.RpcRegister("SyncTurn", SyncTurn);
 
         });
+    }
+
+    private void SyncTurn(string playerId, string senderId)
+    {
+        currentTurnId = playerId;
+        Debug.Log("Turn synced: now it's " + playerId + "'s turn");
     }
 
     private void RpcUpdatePlayers(string data, string arg2)
@@ -60,7 +68,7 @@ public class GameManager : MonoBehaviour
 
         if (playersIds.Count == 2)
         {
-            _playroomKit.RpcCall("AssignIDs","");
+            _playroomKit.RpcCall("AssignIDs", "");
         }
     }
 
@@ -77,6 +85,12 @@ public class GameManager : MonoBehaviour
 
         playerOne = players[0];
         playerTwo = players[1];
+
+        if (_playroomKit.IsHost() && players.Count == 2)
+        {
+            currentTurnId = playerOne.id;
+            _playroomKit.RpcCall("SyncTurn", currentTurnId, PlayroomKit.RpcMode.ALL);
+        }
     }
 
     private void RpcSpawnShape(string data, string senderId)
@@ -136,25 +150,36 @@ public class GameManager : MonoBehaviour
 
     public void OnClickedGrid(int x, int y)
     {
-        string shapeType;
-
-        if (_playroomKit.MyPlayer().id == playerOne.id)
+        if (_playroomKit.MyPlayer().id != currentTurnId)
         {
-            shapeType = "CROSS";
-        }
-        else if (_playroomKit.MyPlayer().id == playerTwo.id)
-        {
-            shapeType = "CIRCLE";
-        }
-        else
-        {
-            Debug.LogWarning("Unkown grid Clicked");
+            Debug.Log("Not your turn!");
             return;
         }
 
-        string data = $"{shapeType}, {x}, {y}";
+        string shapeType = (_playroomKit.MyPlayer().id == playerOne.id) ? "CROSS" : "CIRCLE";
+        string data = $"{shapeType},{x},{y}";
 
         _playroomKit.RpcCall("SpawnShape", data, PlayroomKit.RpcMode.ALL);
+
+        string nextTurn = (_playroomKit.MyPlayer().id == playerOne.id) ? playerTwo.id : playerOne.id;
+        _playroomKit.RpcCall("SyncTurn",nextTurn, PlayroomKit.RpcMode.ALL);
+
+        //if (_playroomKit.MyPlayer().id == playerOne.id)
+        //{
+        //    shapeType = "CROSS";
+        //}
+        //else if (_playroomKit.MyPlayer().id == playerTwo.id)
+        //{
+        //    shapeType = "CIRCLE";
+        //}
+        //else
+        //{
+        //    Debug.LogWarning("Unkown grid Clicked");
+        //    return;
+        //}
+
+        //string data = $"{shapeType}, {x}, {y}";
+
     }
 
     private Vector2 GetGridWorldPosition(int x, int y)
@@ -175,6 +200,8 @@ public class GameManager : MonoBehaviour
 
         playerJoined = true;
         player.OnQuit(RemovePlayer);
+
+        
     }
 
     private static void RemovePlayer(string playerID)
