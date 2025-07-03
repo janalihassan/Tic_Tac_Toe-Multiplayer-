@@ -23,7 +23,9 @@ public class GameManager : MonoBehaviour
     private PlayroomKit.Player playerOne;
     private PlayroomKit.Player playerTwo;
     private string shapeType;
+    private bool gameOver;
 
+    private readonly Dictionary<Vector2Int, string> boardState = new();
     private readonly HashSet<Vector2Int> occupiedCells = new();
     private static readonly List<string> playersIds = new();
     private static Dictionary<string, GameObject> PlayerDict = new();
@@ -52,8 +54,15 @@ public class GameManager : MonoBehaviour
             _playroomKit.RpcRegister("AssignIDs", RpcAssignIds);
             _playroomKit.RpcRegister("UpdateLocalPlayers", RpcUpdatePlayers);
             _playroomKit.RpcRegister("SyncTurn", SyncTurn);
+            _playroomKit.RpcRegister("GameOver", GameOver);
 
         });
+    }
+
+    private void GameOver(string winner, string senderId)
+    {
+        gameOver = true;
+        Debug.Log($"Game Over! Winner is {winner}");
     }
 
     private void SyncTurn(string playerId, string senderId)
@@ -139,13 +148,12 @@ public class GameManager : MonoBehaviour
         }
 
         Vector2Int gridPos = new(x, y);
-        if (occupiedCells.Contains(gridPos))
-        {
-            Debug.LogWarning($"Cell {x},{y} is already taken");
-            return;
-        }
+
 
         occupiedCells.Add(gridPos);
+        boardState[gridPos] = shapeType;
+
+        CheckWinner();
     }
 
     private void Update()
@@ -155,6 +163,71 @@ public class GameManager : MonoBehaviour
             LocalPlayerSet();
             GetOtherPlayers();
         }
+    }
+
+    private void CheckWinner()
+    {
+        string winner;
+
+        for (int i = 0; i < 3; i++)
+        {
+            //Horizontal Line
+            if (HasLine(new Vector2Int(i, 0), new Vector2Int(i, 1), new Vector2Int(i, 2), out winner))
+            {
+                // --------- Declare winner method 
+                DeclareWinner(winner);
+                return;
+            }
+            //vertical line
+            if (HasLine(new Vector2Int(0, i), new Vector2Int(1, i), new Vector2Int(2, i), out winner))
+            {
+                // --------- Declare winner method 
+                DeclareWinner(winner);
+                return;
+
+            }
+        }
+        // Diagonals
+        if (HasLine(new Vector2Int(0, 0), new Vector2Int(1, 1), new Vector2Int(2, 2), out winner))
+        {
+            // --------- Declare winner method 
+            DeclareWinner(winner);
+            return;
+        }
+        if (HasLine(new Vector2Int(0, 2), new Vector2Int(1, 1), new Vector2Int(2, 0), out winner))
+        {
+            // --------- Declare winner method 
+            DeclareWinner(winner);
+            return;
+        }
+    }
+
+    private bool HasLine(Vector2Int a, Vector2Int b, Vector2Int c, out string winner)
+    {
+        winner = null;
+        if (!boardState.ContainsKey(a) || !boardState.ContainsKey(b) || !boardState.ContainsKey(c))
+        {
+            return false;
+        }
+
+        string ShapeA = boardState[a];
+        string ShapeB = boardState[b];
+        string ShapeC = boardState[c];
+
+        if (ShapeA == ShapeB && ShapeB == ShapeC)
+        {
+            winner = ShapeA;
+            return true;
+        }
+        return false;
+
+    }
+
+    private void DeclareWinner(string winner)
+    {
+       if(!_playroomKit.IsHost()) return;
+
+       _playroomKit.RpcCall("GameOver",winner,RpcMode.ALL);
     }
 
 
@@ -182,6 +255,12 @@ public class GameManager : MonoBehaviour
 
     public void OnClickedGrid(int x, int y)
     {
+        if (gameOver)
+        {
+            Debug.LogWarning("Game Over");
+            return;
+        }
+
         if (_playroomKit.MyPlayer().id != currentTurnId)
         {
             Debug.Log("Not your turn!");
@@ -189,7 +268,7 @@ public class GameManager : MonoBehaviour
         }
 
         Vector2Int gridPos = new Vector2Int(x, y);
-        if(occupiedCells.Contains(gridPos))
+        if (occupiedCells.Contains(gridPos))
         {
             Debug.LogWarning("Grid is Already taken");
             return;
@@ -197,9 +276,10 @@ public class GameManager : MonoBehaviour
 
         occupiedCells.Add(gridPos);
 
-        string data = $"{shapeType},{x},{y}";
-
+        string moveShape = (_playroomKit.MyPlayer().id == playerOne.id) ? "CROSS" : "CIRCLE";
+        string data = $"{moveShape},{x},{y}";
         _playroomKit.RpcCall("SpawnShape", data, PlayroomKit.RpcMode.ALL);
+
         string nextTurn = (_playroomKit.MyPlayer().id == playerOne.id) ? playerTwo.id : playerOne.id;
         _playroomKit.RpcCall("SyncTurn", nextTurn, PlayroomKit.RpcMode.ALL);
 
