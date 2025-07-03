@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
     private PlayroomKit.Player playerTwo;
     private string shapeType;
 
+    private readonly HashSet<Vector2Int> occupiedCells = new();
     private static readonly List<string> playersIds = new();
     private static Dictionary<string, GameObject> PlayerDict = new();
     private static readonly List<PlayroomKit.Player> players = new();
@@ -120,6 +121,8 @@ public class GameManager : MonoBehaviour
         int x = int.Parse(parts[1]);
         int y = int.Parse(parts[2]);
 
+
+
         Vector2 spawnPos = GetGridWorldPosition(x, y);
 
         if (shapeType == "CROSS")
@@ -134,6 +137,15 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogWarning($"Unknown shape type: {shapeType}");
         }
+
+        Vector2Int gridPos = new(x, y);
+        if (occupiedCells.Contains(gridPos))
+        {
+            Debug.LogWarning($"Cell {x},{y} is already taken");
+            return;
+        }
+
+        occupiedCells.Add(gridPos);
     }
 
     private void Update()
@@ -175,6 +187,15 @@ public class GameManager : MonoBehaviour
             Debug.Log("Not your turn!");
             return;
         }
+
+        Vector2Int gridPos = new Vector2Int(x, y);
+        if(occupiedCells.Contains(gridPos))
+        {
+            Debug.LogWarning("Grid is Already taken");
+            return;
+        }
+
+        occupiedCells.Add(gridPos);
 
         string data = $"{shapeType},{x},{y}";
 
