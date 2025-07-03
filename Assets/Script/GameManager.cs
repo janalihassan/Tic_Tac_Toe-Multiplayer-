@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     public event EventHandler OnShapeAssign;
+    public event Action<string> OnGameOver;
     public event Action<string> OnTurnchanged;
 
     private static bool playerJoined;
@@ -59,10 +60,11 @@ public class GameManager : MonoBehaviour
         });
     }
 
-    private void GameOver(string winner, string senderId)
+    private void GameOver(string winnerId, string senderId)
     {
         gameOver = true;
-        Debug.Log($"Game Over! Winner is {winner}");
+        OnGameOver?.Invoke(winnerId);
+        Debug.Log($"Game Over! Winner is {winnerId}");
     }
 
     private void SyncTurn(string playerId, string senderId)
@@ -223,11 +225,14 @@ public class GameManager : MonoBehaviour
 
     }
 
-    private void DeclareWinner(string winner)
+    private void DeclareWinner(string winnerShape)
     {
-       if(!_playroomKit.IsHost()) return;
+        if (!_playroomKit.IsHost()) return;
 
-       _playroomKit.RpcCall("GameOver",winner,RpcMode.ALL);
+        string winnerId = (winnerShape == "CROSS")? playerOne.id : playerTwo.id;
+
+
+        _playroomKit.RpcCall("GameOver", winnerId, RpcMode.ALL);
     }
 
 
@@ -322,6 +327,10 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    public string GetMyPlayerId()
+    {
+        return _playroomKit.MyPlayer().id;
+    }
     public string GetShapeType()
     {
         return shapeType;
