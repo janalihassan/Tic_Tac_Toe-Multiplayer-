@@ -8,12 +8,12 @@ using System.Linq;
 public class GameManager : MonoBehaviour
 {
     private const float GRID_SIZE = 3.1f;
-
     public static GameManager Instance { get; private set; }
+
+    public event EventHandler OnShapeAssign;
 
     private static bool playerJoined;
     private PlayroomKit _playroomKit = new();
-
 
     [SerializeField] private GameObject cross;
     [SerializeField] private GameObject cricle;
@@ -21,6 +21,7 @@ public class GameManager : MonoBehaviour
     private string currentTurnId = "";
     private PlayroomKit.Player playerOne;
     private PlayroomKit.Player playerTwo;
+    private string shapeType;
 
     private static readonly List<string> playersIds = new();
     private static Dictionary<string, GameObject> PlayerDict = new();
@@ -37,10 +38,10 @@ public class GameManager : MonoBehaviour
         _playroomKit.InsertCoin(new InitOptions()
         {
             maxPlayersPerRoom = 2,
-            defaultPlayerStates = new() 
+            defaultPlayerStates = new()
             {
             {"score", 0},
-      
+
             },
         }, () =>
         {
@@ -86,11 +87,27 @@ public class GameManager : MonoBehaviour
         playerOne = players[0];
         playerTwo = players[1];
 
+        if (_playroomKit.MyPlayer().id == playerOne.id)
+        {
+            shapeType = "CROSS";
+        }
+        else if (_playroomKit.MyPlayer().id == playerTwo.id)
+        {
+            shapeType = "CIRCLE";
+        }
+        else
+        {
+            Debug.LogWarning("Invalid shape type");
+            return;
+        }
+
         if (_playroomKit.IsHost() && players.Count == 2)
         {
             currentTurnId = playerOne.id;
             _playroomKit.RpcCall("SyncTurn", currentTurnId, PlayroomKit.RpcMode.ALL);
         }
+
+        OnShapeAssign?.Invoke(this, EventArgs.Empty);
     }
 
     private void RpcSpawnShape(string data, string senderId)
@@ -156,29 +173,11 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        string shapeType = (_playroomKit.MyPlayer().id == playerOne.id) ? "CROSS" : "CIRCLE";
         string data = $"{shapeType},{x},{y}";
 
         _playroomKit.RpcCall("SpawnShape", data, PlayroomKit.RpcMode.ALL);
-
         string nextTurn = (_playroomKit.MyPlayer().id == playerOne.id) ? playerTwo.id : playerOne.id;
-        _playroomKit.RpcCall("SyncTurn",nextTurn, PlayroomKit.RpcMode.ALL);
-
-        //if (_playroomKit.MyPlayer().id == playerOne.id)
-        //{
-        //    shapeType = "CROSS";
-        //}
-        //else if (_playroomKit.MyPlayer().id == playerTwo.id)
-        //{
-        //    shapeType = "CIRCLE";
-        //}
-        //else
-        //{
-        //    Debug.LogWarning("Unkown grid Clicked");
-        //    return;
-        //}
-
-        //string data = $"{shapeType}, {x}, {y}";
+        _playroomKit.RpcCall("SyncTurn", nextTurn, PlayroomKit.RpcMode.ALL);
 
     }
 
@@ -201,7 +200,7 @@ public class GameManager : MonoBehaviour
         playerJoined = true;
         player.OnQuit(RemovePlayer);
 
-        
+
     }
 
     private static void RemovePlayer(string playerID)
@@ -217,5 +216,10 @@ public class GameManager : MonoBehaviour
         {
             Debug.LogWarning("Player is not in dictionary");
         }
+    }
+
+    public string GetShapeType()
+    {
+        return shapeType;
     }
 }
