@@ -225,8 +225,12 @@ public class GameManager : MonoBehaviour
     {
         return shapeType;
     }
-    public string GetMyPlayerId()
+    public string GetPlayerOne()
     {
-        return _playroomKit.MyPlayer().id;
+        return playerOne.id ?? "";
+    }
+    public string GetPlayerTwo()
+    {
+        return playerTwo.id ?? "";
     }
 }

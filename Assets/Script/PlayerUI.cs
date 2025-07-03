@@ -24,24 +24,30 @@ public class PlayerUI : MonoBehaviour
 
     private void GameManager_OnTurnchanged(string TurnId)
     {
-        var myId = GameManager.Instance.GetMyPlayerId();
-        var myShape = GameManager.Instance.GetShapeType();
 
-        if (TurnId == myId)
+        string crossPlayerId = GameManager.Instance.GetPlayerOne();
+        string circlePlayerId = GameManager.Instance.GetPlayerTwo();
+
+        if (string.IsNullOrEmpty(crossPlayerId) || string.IsNullOrEmpty(circlePlayerId))
         {
-            if (myShape == "CROSS")
-            {
-                crossArrow.SetActive(true);
-                circleArrow.SetActive(false);
-            }
-            else if (myShape == "CIRCLE")
-            {
-                circleArrow.SetActive(true);
-                crossArrow.SetActive(false);
-            }
+            crossArrow.SetActive(false);
+            circleArrow.SetActive(false);
+            return;
+        }
+
+        if (TurnId == crossPlayerId)
+        {
+            crossArrow.SetActive(true);
+            circleArrow.SetActive(false);
+        }
+        else if (TurnId == circlePlayerId)
+        {
+            circleArrow.SetActive(true);
+            crossArrow.SetActive(false);
         }
         else
         {
+            Debug.LogWarning("Unknow State");
             crossArrow.SetActive(false);
             circleArrow.SetActive(false);
         }
