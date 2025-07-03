@@ -11,6 +11,7 @@ public class GameManager : MonoBehaviour
     public static GameManager Instance { get; private set; }
 
     public event EventHandler OnShapeAssign;
+    public event Action<string> OnTurnchanged;
 
     private static bool playerJoined;
     private PlayroomKit _playroomKit = new();
@@ -58,6 +59,8 @@ public class GameManager : MonoBehaviour
     {
         currentTurnId = playerId;
         Debug.Log("Turn synced: now it's " + playerId + "'s turn");
+
+        OnTurnchanged?.Invoke(currentTurnId);
     }
 
     private void RpcUpdatePlayers(string data, string arg2)
@@ -221,5 +224,9 @@ public class GameManager : MonoBehaviour
     public string GetShapeType()
     {
         return shapeType;
+    }
+    public string GetMyPlayerId()
+    {
+        return _playroomKit.MyPlayer().id;
     }
 }
