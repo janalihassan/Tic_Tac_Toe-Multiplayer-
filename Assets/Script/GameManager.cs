@@ -4,6 +4,7 @@ using Playroom;
 using static Playroom.PlayroomKit;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine.InputSystem;
 
 public class GameManager : MonoBehaviour
 {
@@ -19,6 +20,7 @@ public class GameManager : MonoBehaviour
 
     [SerializeField] private GameObject cross;
     [SerializeField] private GameObject cricle;
+    [SerializeField] private GameObject winningLine;
 
     private string currentTurnId = "";
     private PlayroomKit.Player playerOne;
@@ -42,6 +44,7 @@ public class GameManager : MonoBehaviour
     {
         _playroomKit.InsertCoin(new InitOptions()
         {
+            gameId = "8S1HdfCLr5WhisdRN1gc",
             maxPlayersPerRoom = 2,
             defaultPlayerStates = new()
             {
@@ -60,11 +63,43 @@ public class GameManager : MonoBehaviour
         });
     }
 
-    private void GameOver(string winnerId, string senderId)
+    private void GameOver(string data, string senderId)
     {
         gameOver = true;
+
+        var parts = data.Split('|');
+        string winnerId = parts[0];
+
+        string[] cellStrings = parts[1].Split(";");
+
+        Vector2Int[] winningCells = cellStrings.Select(s =>
+        {
+            var xy = s.Split(',');
+            return new Vector2Int(int.Parse(xy[0]), int.Parse(xy[1]));
+        }).ToArray();
+
+        DrawWinningLine(winningCells);
+
         OnGameOver?.Invoke(winnerId);
         Debug.Log($"Game Over! Winner is {winnerId}");
+    }
+
+    private void DrawWinningLine(Vector2Int[] winningCells)
+    {
+        if(winningCells.Length != 3)return;
+
+        Vector3 start = GetGridWorldPosition(winningCells[0].x, winningCells[0].y);
+        Vector3 end = GetGridWorldPosition(winningCells[2].x, winningCells[2].y);
+
+        Vector2 center = (start + end) / 2f;
+        Vector2 direction = end - start;
+
+        float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+        float length = direction.magnitude;
+
+        GameObject line = Instantiate(winningLine, center, Quaternion.Euler(0, 0, angle));
+        line.transform.localScale = new Vector3(length, line.transform.localScale.y, 1f);
+
     }
 
     private void SyncTurn(string playerId, string senderId)
@@ -170,21 +205,22 @@ public class GameManager : MonoBehaviour
     private void CheckWinner()
     {
         string winner;
+        Vector2Int[] winningCells = null;   
 
         for (int i = 0; i < 3; i++)
         {
             //Horizontal Line
             if (HasLine(new Vector2Int(i, 0), new Vector2Int(i, 1), new Vector2Int(i, 2), out winner))
             {
-                // --------- Declare winner method 
-                DeclareWinner(winner);
+                winningCells = new[] { new Vector2Int(i, 0), new Vector2Int(i, 1), new Vector2Int(i, 2) };
+                DeclareWinner(winner,winningCells);
                 return;
             }
             //vertical line
             if (HasLine(new Vector2Int(0, i), new Vector2Int(1, i), new Vector2Int(2, i), out winner))
             {
-                // --------- Declare winner method 
-                DeclareWinner(winner);
+                winningCells = new[] { new Vector2Int(0, i), new Vector2Int(1, i), new Vector2Int(2, i), };
+                DeclareWinner(winner,winningCells);
                 return;
 
             }
@@ -192,14 +228,14 @@ public class GameManager : MonoBehaviour
         // Diagonals
         if (HasLine(new Vector2Int(0, 0), new Vector2Int(1, 1), new Vector2Int(2, 2), out winner))
         {
-            // --------- Declare winner method 
-            DeclareWinner(winner);
+            winningCells = new[] { new Vector2Int(0, 0), new Vector2Int(1, 1), new Vector2Int(2, 2), };
+            DeclareWinner(winner,winningCells);
             return;
         }
         if (HasLine(new Vector2Int(0, 2), new Vector2Int(1, 1), new Vector2Int(2, 0), out winner))
         {
-            // --------- Declare winner method 
-            DeclareWinner(winner);
+            winningCells = new[] {new Vector2Int(0,2), new Vector2Int(1,1), new Vector2Int(2,0) };
+            DeclareWinner(winner,winningCells);
             return;
         }
     }
@@ -225,14 +261,18 @@ public class GameManager : MonoBehaviour
 
     }
 
-    private void DeclareWinner(string winnerShape)
+    private void DeclareWinner(string winnerShape, Vector2Int[] winningCells)
     {
         if (!_playroomKit.IsHost()) return;
 
         string winnerId = (winnerShape == "CROSS")? playerOne.id : playerTwo.id;
 
+        DrawWinningLine(winningCells);
 
-        _playroomKit.RpcCall("GameOver", winnerId, RpcMode.ALL);
+        string cellsData = string.Join(";",winningCells.Select(c=> $"{c.x},{c.y}"));
+        string data = $"{winnerId}|{cellsData}";
+
+        _playroomKit.RpcCall("GameOver", data, RpcMode.ALL);
     }
 
 
